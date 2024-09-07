@@ -191,8 +191,7 @@ LIMINE_CONF="$LIMINE_DIR/limine.conf"
 PACMAN_HOOK_DIR="/etc/pacman.d/hooks"
 LIMINE_HOOK_PATH="$PACMAN_HOOK_DIR/limine_upgrade.hook"
 
-# Determine which boot modes are supported (UEFI or BIOS)
-UEFI=$(test -e "/sys/firmware/efi/fw_platform_size")
+UEFI="/sys/firmware/efi/fw_platform_size"
 
 install() {
     # Define the Limine configuration file
@@ -237,7 +236,7 @@ install() {
         sudo mkdir -p "$PACMAN_HOOK_DIR" || perror $E_PACMAN_HOOK_DIR_FAILED
     fi
 
-    if $UEFI; then
+    if test -e "$UEFI"; then
         # Create the boot entry
         sudo efibootmgr --create --disk "$DISK" --loader "/limine/BOOTX64.EFI" --label "$LABEL" --unicode || perror $E_BOOT_ENTRY_CREATE_FAILED
         # Install the boot loader
@@ -271,7 +270,7 @@ uninstall() {
     if test -e "$LIMINE_DIR"; then
         sudo rm -rf "$LIMINE_DIR" || perror $E_BOOT_LOADER_UNINSTALL_FAILED
     fi
-    if $UEFI; then
+    if test -e "$UEFI"; then
         # Delete all boot entries on the given partition
         sudo efibootmgr | grep -e "$UUID" | while read -a boot_order; do
             if ! BOOT_NUM=$(remove_prefix_and_postfix "${boot_order[0]}" 'Boot' '*'); then
