@@ -4,7 +4,7 @@ Automatically installs a boot loader ([Limine](https://limine-bootloader.org/)) 
 
 ## Usage
 
-Execute the "auto_limine.sh" script with Bash. Provide the path to your boot directory as an argument.
+As root, execute the "auto_limine.sh" script with Bash. Provide the path to your boot directory as an argument.
 
 ```bash
 bash auto_limine.sh /dev/sda1
@@ -13,7 +13,7 @@ bash auto_limine.sh /dev/sda1
 To uninstall, provide the "-u" flag
 
 ```bash
-bash auto_limine.sh -u /dev/sda1
+bash auto_limine.sh /dev/sda1 -u
 ```
 
 ## TODO

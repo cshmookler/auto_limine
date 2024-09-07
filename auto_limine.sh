@@ -207,14 +207,14 @@ install() {
 
     # Create the Limine boot directory (contains the boot loader and Limine configuration file)
     if ! test -e "$LIMINE_DIR"; then
-        sudo mkdir -p "$LIMINE_DIR" || perror $E_LIMINE_DIR_FAILED
+        mkdir -p "$LIMINE_DIR" || perror $E_LIMINE_DIR_FAILED
     fi
 
     # Create the Limine configuration file
     vertical_sep
     echo "$LIMINE_CONF"
     vertical_sep
-    limine_conf | sudo tee "$LIMINE_CONF" || perror $E_CONFIG_SETUP_FAILED
+    limine_conf | tee "$LIMINE_CONF" || perror $E_CONFIG_SETUP_FAILED
     vertical_sep
 
     # Define the Limine upgrade hook (updates the boot loader when Limine is upgraded)
@@ -233,30 +233,30 @@ install() {
 
     # Create the Pacman hook directory
     if ! test -e "$PACMAN_HOOK_DIR"; then
-        sudo mkdir -p "$PACMAN_HOOK_DIR" || perror $E_PACMAN_HOOK_DIR_FAILED
+        mkdir -p "$PACMAN_HOOK_DIR" || perror $E_PACMAN_HOOK_DIR_FAILED
     fi
 
     if test -e "$UEFI"; then
         # Create the boot entry
-        sudo efibootmgr --create --disk "$DISK" --loader "/limine/BOOTX64.EFI" --label "$LABEL" --unicode || perror $E_BOOT_ENTRY_CREATE_FAILED
+        efibootmgr --create --disk "$DISK" --loader "/limine/BOOTX64.EFI" --label "$LABEL" --unicode || perror $E_BOOT_ENTRY_CREATE_FAILED
         # Install the boot loader
-        sudo cp "/usr/share/limine/BOOTX64.EFI" "$LIMINE_DIR" || perror $E_BOOT_LOADER_INSTALL_FAILED
+        cp "/usr/share/limine/BOOTX64.EFI" "$LIMINE_DIR" || perror $E_BOOT_LOADER_INSTALL_FAILED
         # Setup the Limine configuration file
         vertical_sep
         echo "$LIMINE_HOOK_PATH"
         vertical_sep
-        limine_hook "'/usr/bin/cp' '/usr/share/limine/BOOTX64.EFI' '$LIMINE_DIR'" | sudo tee "$LIMINE_HOOK_PATH" || perror $E_LIMINE_HOOK_SETUP_FAILED
+        limine_hook "'/usr/bin/cp' '/usr/share/limine/BOOTX64.EFI' '$LIMINE_DIR'" | tee "$LIMINE_HOOK_PATH" || perror $E_LIMINE_HOOK_SETUP_FAILED
         vertical_sep
     else
         # Create the boot entry
-        sudo limine bios-install "$DISK" || perror $E_BOOT_ENTRY_CREATE_FAILED
+        limine bios-install "$DISK" || perror $E_BOOT_ENTRY_CREATE_FAILED
         # Install the boot loader
-        sudo cp "/usr/share/limine/limine-bios.sys" "$LIMINE_DIR" || perror $E_BOOT_LOADER_INSTALL_FAILED
+        cp "/usr/share/limine/limine-bios.sys" "$LIMINE_DIR" || perror $E_BOOT_LOADER_INSTALL_FAILED
         # Setup the Limine configuration file
         vertical_sep
         echo "$LIMINE_HOOK_PATH"
         vertical_sep
-        limine_hook "'/usr/bin/cp' '/usr/share/limine/limine-bios.sys' '$LIMINE_DIR' && '/usr/bin/limine' bios-install '$DISK'" | sudo tee "$LIMINE_HOOK_PATH" || perror $E_LIMINE_HOOK_SETUP_FAILED
+        limine_hook "'/usr/bin/cp' '/usr/share/limine/limine-bios.sys' '$LIMINE_DIR' && '/usr/bin/limine' bios-install '$DISK'" | tee "$LIMINE_HOOK_PATH" || perror $E_LIMINE_HOOK_SETUP_FAILED
         vertical_sep
     fi
 }
@@ -264,23 +264,23 @@ install() {
 uninstall() {
     # Remove the upgrade hook for Limine
     if test -e "$LIMINE_HOOK_PATH"; then
-        sudo rm "$LIMINE_HOOK_PATH" || perror $E_LIMINE_HOOK_REMOVE_FAILED
+        rm "$LIMINE_HOOK_PATH" || perror $E_LIMINE_HOOK_REMOVE_FAILED
     fi
     # Remove the Limine directory (contains the boot loader and configuration file)
     if test -e "$LIMINE_DIR"; then
-        sudo rm -rf "$LIMINE_DIR" || perror $E_BOOT_LOADER_UNINSTALL_FAILED
+        rm -rf "$LIMINE_DIR" || perror $E_BOOT_LOADER_UNINSTALL_FAILED
     fi
     if test -e "$UEFI"; then
         # Delete all boot entries on the given partition
-        sudo efibootmgr | grep -e "$UUID" | while read -a boot_order; do
+        efibootmgr | grep -e "$UUID" | while read -a boot_order; do
             if ! BOOT_NUM=$(remove_prefix_and_postfix "${boot_order[0]}" 'Boot' '*'); then
                 perror $E_BOOT_ENTRY_DELETE_FAILED
             fi
-            sudo efibootmgr --bootnum "$BOOT_NUM" --delete-bootnum || perror $E_BOOT_ENTRY_DELETE_FAILED
+            efibootmgr --bootnum "$BOOT_NUM" --delete-bootnum || perror $E_BOOT_ENTRY_DELETE_FAILED
         done || perror $E_BOOT_ENTRY_DELETE_FAILED
     else
         # Delete the associated boot entry on the disk of the given partition
-        sudo limine bios-install --uninstall "$DISK" || perror $E_BOOT_ENTRY_DELETE_FAILED
+        limine bios-install --uninstall "$DISK" || perror $E_BOOT_ENTRY_DELETE_FAILED
     fi
 }
 
