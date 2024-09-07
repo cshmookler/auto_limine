@@ -187,6 +187,7 @@ fi
 
 LIMINE_DIR="$MOUNT/limine"
 LIMINE_CONF="$LIMINE_DIR/limine.conf"
+UNINSTALL_DATA_FILE="$LIMINE_DIR/uninstall_data"
 
 PACMAN_HOOK_DIR="/etc/pacman.d/hooks"
 LIMINE_HOOK_PATH="$PACMAN_HOOK_DIR/limine_upgrade.hook"
@@ -249,7 +250,7 @@ install() {
         vertical_sep
     else
         # Create the boot entry
-        limine bios-install "$DISK" || perror $E_BOOT_ENTRY_CREATE_FAILED
+        limine bios-install --uninstall-data-file"$UNINSTALL_DATA_FILE" "$DISK" || perror $E_BOOT_ENTRY_CREATE_FAILED
         # Install the boot loader
         cp "/usr/share/limine/limine-bios.sys" "$LIMINE_DIR" || perror $E_BOOT_LOADER_INSTALL_FAILED
         # Setup the Limine configuration file
@@ -266,10 +267,6 @@ uninstall() {
     if test -e "$LIMINE_HOOK_PATH"; then
         rm "$LIMINE_HOOK_PATH" || perror $E_LIMINE_HOOK_REMOVE_FAILED
     fi
-    # Remove the Limine directory (contains the boot loader and configuration file)
-    if test -e "$LIMINE_DIR"; then
-        rm -rf "$LIMINE_DIR" || perror $E_BOOT_LOADER_UNINSTALL_FAILED
-    fi
     if test -e "$UEFI"; then
         # Delete all boot entries on the given partition
         efibootmgr | grep -e "$UUID" | while read -a boot_order; do
@@ -280,7 +277,11 @@ uninstall() {
         done || perror $E_BOOT_ENTRY_DELETE_FAILED
     else
         # Delete the associated boot entry on the disk of the given partition
-        limine bios-install --uninstall "$DISK" || perror $E_BOOT_ENTRY_DELETE_FAILED
+        limine bios-install --uninstall --uninstall-data-file"$UNINSTALL_DATA_FILE" "$DISK" || perror $E_BOOT_ENTRY_DELETE_FAILED
+    fi
+    # Remove the Limine directory (contains the boot loader, uninstallation data, and Limine configuration file)
+    if test -e "$LIMINE_DIR"; then
+        rm -rf "$LIMINE_DIR" || perror $E_BOOT_LOADER_UNINSTALL_FAILED
     fi
 }
 
