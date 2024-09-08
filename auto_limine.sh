@@ -41,9 +41,9 @@ E_LIMINE_HOOK_DELETE=11
 E_UEFI_BOOT_LOADER_INSTALL=12
 E_UEFI_BOOT_ENTRY_CREATE=13
 E_UEFI_BOOT_ENTRY_DELETE=14
-E_BIOS_STAGE_1_INSTALL=15
-E_BIOS_STAGE_1_UNINSTALL=16
-E_BIOS_STAGE_2_INSTALL=17
+E_BIOS_STAGE_1_AND_2_INSTALL=15
+E_BIOS_STAGE_1_AND_2_UNINSTALL=16
+E_BIOS_STAGE_3_INSTALL=17
 E_LIMINE_UNINSTALL_DATA_MISSING=18
 
 # Keep track of the first reported error
@@ -100,14 +100,14 @@ perror() {
         $E_UEFI_BOOT_ENTRY_DELETE)
             redtext "Error: Failed to delete the boot entry"
             ;;
-        $E_BIOS_STAGE_1_INSTALL)
-            redtext "Error: Failed to install the stage 1 boot loader"
+        $E_BIOS_STAGE_1_AND_2_INSTALL)
+            redtext "Error: Failed to install the stage 1 and stage 2 boot loaders"
             ;;
-        $E_BIOS_STAGE_1_UNINSTALL)
-            redtext "Error: Failed to uninstall the stage 1 boot loader"
+        $E_BIOS_STAGE_1_AND_2_UNINSTALL)
+            redtext "Error: Failed to uninstall the stage 1 and stage 2 boot loaders"
             ;;
-        $E_BIOS_STAGE_2_INSTALL)
-            redtext "Error: Failed to install the stage 2 boot loader"
+        $E_BIOS_STAGE_3_INSTALL)
+            redtext "Error: Failed to install the stage 3 boot loader"
             ;;
         $E_LIMINE_UNINSTALL_DATA_MISSING)
             redtext "Error: Failed to find the uninstallation data for Limine"
@@ -263,9 +263,9 @@ install() {
         vertical_sep
     else
         # Install the stage 1 boot loader
-        limine bios-install --uninstall-data-file"$UNINSTALL_DATA_FILE" "$DISK" || perror $E_BIOS_STAGE_1_INSTALL
+        limine bios-install --uninstall-data-file"$UNINSTALL_DATA_FILE" "$DISK" || perror $E_BIOS_STAGE_1_AND_2_INSTALL
         # Install the stage 2 boot loader
-        cp "/usr/share/limine/limine-bios.sys" "$LIMINE_DIR" || perror $E_BIOS_STAGE_2_INSTALL
+        cp "/usr/share/limine/limine-bios.sys" "$LIMINE_DIR" || perror $E_BIOS_STAGE_3_INSTALL
         # the Limine configuration file
         vertical_sep
         echo "$LIMINE_HOOK_PATH"
@@ -293,7 +293,7 @@ uninstall() {
             perror $E_LIMINE_UNINSTALL_DATA_MISSING
         fi
         # Delete the associated boot entry on the disk of the given partition.
-        limine bios-install --uninstall --uninstall-data-file"$UNINSTALL_DATA_FILE" "$DISK" || perror $E_BIOS_STAGE_1_UNINSTALL
+        limine bios-install --uninstall --uninstall-data-file"$UNINSTALL_DATA_FILE" "$DISK" || perror $E_BIOS_STAGE_1_AND_2_UNINSTALL
     fi
     # Remove the Limine directory (contains the boot loader, uninstallation data, and Limine configuration file).
     if test -e "$LIMINE_DIR"; then
