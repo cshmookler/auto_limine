@@ -23,7 +23,7 @@ redtext() {
 
 # Program name and version
 NAME=auto_limine
-VERSION=20240823
+VERSION=20240907
 
 # Error codes
 E_SUCCESS=0
@@ -32,19 +32,22 @@ E_PART_MULTIPLE_GIVEN=2
 E_PART_MISSING=3
 E_PART_INVALID=4
 E_LABEL_INVALID=5
-E_CONFIG_SETUP_FAILED=6
-E_BOOT_LOADER_INSTALL_FAILED=7
-E_BOOT_ENTRY_CREATE_FAILED=8
-E_CONFIG_REMOVE_FAILED=9
-E_BOOT_LOADER_UNINSTALL_FAILED=10
-E_BOOT_ENTRY_DELETE_FAILED=11
-E_LIMINE_HOOK_SETUP_FAILED=12
-E_LIMINE_HOOK_REMOVE_FAILED=13
-E_LIMINE_DIR_FAILED=14
-E_PACMAN_HOOK_DIR_FAILED=15
+E_LIMINE_DIR_CREATE=6
+E_LIMINE_DIR_DELETE=7
+E_LIMINE_CONFIG_CREATE=8
+E_PACMAN_HOOK_DIR_CREATE=9
+E_LIMINE_HOOK_CREATE=10
+E_LIMINE_HOOK_DELETE=11
+E_UEFI_BOOT_LOADER_INSTALL=12
+E_UEFI_BOOT_ENTRY_CREATE=13
+E_UEFI_BOOT_ENTRY_DELETE=14
+E_BIOS_STAGE_1_INSTALL=15
+E_BIOS_STAGE_1_UNINSTALL=16
+E_BIOS_STAGE_2_INSTALL=17
+E_LIMINE_UNINSTALL_DATA_MISSING=18
 
 # Keep track of the first reported error
-FIRST_ERROR=0
+FIRST_ERROR=$E_SUCCESS
 
 # Error reporting
 perror() {
@@ -70,35 +73,44 @@ perror() {
         $E_LABEL_INVALID)
             redtext "Error: Invalid boot label"
             ;;
-        $E_CONFIG_SETUP_FAILED)
-            redtext "Error: Failed to create the limine configuration file"
+        $E_LIMINE_DIR_CREATE)
+            redtext "Error: Failed to create a directory for Limine on the boot partition"
             ;;
-        $E_BOOT_LOADER_INSTALL_FAILED)
+        $E_LIMINE_DIR_DELETE)
+            redtext "Error: Failed to delete the Limine directory on the boot partition"
+            ;;
+        $E_LIMINE_CONFIG_CREATE)
+            redtext "Error: Failed to create the Limine configuration file"
+            ;;
+        $E_PACMAN_HOOK_DIR_CREATE)
+            redtext "Error: Failed to create the Pacman hook directory"
+            ;;
+        $E_LIMINE_HOOK_CREATE)
+            redtext "Error: Failed to create the upgrade hook for Limine"
+            ;;
+        $E_LIMINE_HOOK_DELETE)
+            redtext "Error: Failed to delete the upgrade hook for Limine"
+            ;;
+        $E_UEFI_BOOT_LOADER_INSTALL)
             redtext "Error: Failed to install the boot loader"
             ;;
-        $E_BOOT_ENTRY_CREATE_FAILED)
+        $E_UEFI_BOOT_ENTRY_CREATE)
             redtext "Error: Failed to create the boot entry"
             ;;
-        $E_CONFIG_REMOVE_FAILED)
-            redtext "Error: Failed to remove the limine configuration file"
-            ;;
-        $E_BOOT_LOADER_UNINSTALL_FAILED)
-            redtext "Error: Failed to uninstall the boot loader"
-            ;;
-        $E_BOOT_ENTRY_DELETE_FAILED)
+        $E_UEFI_BOOT_ENTRY_DELETE)
             redtext "Error: Failed to delete the boot entry"
             ;;
-        $E_LIMINE_HOOK_SETUP_FAILED)
-            redtext "Error: Failed to setup the upgrade hook for Limine"
+        $E_BIOS_STAGE_1_INSTALL)
+            redtext "Error: Failed to install the stage 1 boot loader"
             ;;
-        $E_LIMINE_HOOK_REMOVE_FAILED)
-            redtext "Error: Failed to remove the upgrade hook for Limine"
+        $E_BIOS_STAGE_1_UNINSTALL)
+            redtext "Error: Failed to uninstall the stage 1 boot loader"
             ;;
-        $E_LIMINE_DIR_FAILED)
-            redtext "Error: Failed to create the Limine directory"
+        $E_BIOS_STAGE_2_INSTALL)
+            redtext "Error: Failed to install the stage 2 boot loader"
             ;;
-        $E_PACMAN_HOOK_DIR_FAILED)
-            redtext "Error: Failed to create the Pacman hook directory"
+        $E_LIMINE_UNINSTALL_DATA_MISSING)
+            redtext "Error: Failed to find the uninstallation data for Limine"
             ;;
         *)
             redtext "Error: Unknown"
@@ -107,7 +119,7 @@ perror() {
 }
 perror_and_exit() {
     perror "$1"
-    exit $FIRST_ERROR
+    exit "$1"
 }
 
 # Positional Arguments
@@ -170,11 +182,12 @@ while test "$#" -gt 0; do
     esac
 done
 
-# Verify that 
+# Verify that a partition was given.
 if test -z "$PART"; then
     usage_and_exit $E_PART_MISSING
 fi
 
+# Get the associated disk, mount point, and UUID of the given partition.
 if ! DISK=$(lsblk -npdo pkname "$PART") || test -z "$DISK"; then
     usage_and_exit $E_PART_INVALID
 fi
@@ -208,14 +221,14 @@ install() {
 
     # Create the Limine boot directory (contains the boot loader and Limine configuration file)
     if ! test -e "$LIMINE_DIR"; then
-        mkdir -p "$LIMINE_DIR" || perror $E_LIMINE_DIR_FAILED
+        mkdir -p "$LIMINE_DIR" || perror $E_LIMINE_DIR_CREATE
     fi
 
     # Create the Limine configuration file
     vertical_sep
     echo "$LIMINE_CONF"
     vertical_sep
-    limine_conf | tee "$LIMINE_CONF" || perror $E_CONFIG_SETUP_FAILED
+    limine_conf | tee "$LIMINE_CONF" || perror $E_LIMINE_CONFIG_CREATE
     vertical_sep
 
     # Define the Limine upgrade hook (updates the boot loader when Limine is upgraded)
@@ -234,30 +247,30 @@ install() {
 
     # Create the Pacman hook directory
     if ! test -e "$PACMAN_HOOK_DIR"; then
-        mkdir -p "$PACMAN_HOOK_DIR" || perror $E_PACMAN_HOOK_DIR_FAILED
+        mkdir -p "$PACMAN_HOOK_DIR" || perror $E_PACMAN_HOOK_DIR_CREATE
     fi
 
     if test -e "$UEFI"; then
         # Create the boot entry
-        efibootmgr --create --disk "$DISK" --loader "/limine/BOOTX64.EFI" --label "$LABEL" --unicode || perror $E_BOOT_ENTRY_CREATE_FAILED
+        efibootmgr --create --disk "$DISK" --loader "/limine/BOOTX64.EFI" --label "$LABEL" --unicode || perror $E_UEFI_BOOT_ENTRY_CREATE
         # Install the boot loader
-        cp "/usr/share/limine/BOOTX64.EFI" "$LIMINE_DIR" || perror $E_BOOT_LOADER_INSTALL_FAILED
-        # Setup the Limine configuration file
+        cp "/usr/share/limine/BOOTX64.EFI" "$LIMINE_DIR" || perror $E_UEFI_BOOT_LOADER_INSTALL
+        # Create the Limine configuration file
         vertical_sep
         echo "$LIMINE_HOOK_PATH"
         vertical_sep
-        limine_hook "'/usr/bin/cp' '/usr/share/limine/BOOTX64.EFI' '$LIMINE_DIR'" | tee "$LIMINE_HOOK_PATH" || perror $E_LIMINE_HOOK_SETUP_FAILED
+        limine_hook "'/usr/bin/cp' '/usr/share/limine/BOOTX64.EFI' '$LIMINE_DIR'" | tee "$LIMINE_HOOK_PATH" || perror $E_LIMINE_HOOK_CREATE
         vertical_sep
     else
-        # Create the boot entry
-        limine bios-install --uninstall-data-file"$UNINSTALL_DATA_FILE" "$DISK" || perror $E_BOOT_ENTRY_CREATE_FAILED
-        # Install the boot loader
-        cp "/usr/share/limine/limine-bios.sys" "$LIMINE_DIR" || perror $E_BOOT_LOADER_INSTALL_FAILED
-        # Setup the Limine configuration file
+        # Install the stage 1 boot loader
+        limine bios-install --uninstall-data-file"$UNINSTALL_DATA_FILE" "$DISK" || perror $E_BIOS_STAGE_1_INSTALL
+        # Install the stage 2 boot loader
+        cp "/usr/share/limine/limine-bios.sys" "$LIMINE_DIR" || perror $E_BIOS_STAGE_2_INSTALL
+        # the Limine configuration file
         vertical_sep
         echo "$LIMINE_HOOK_PATH"
         vertical_sep
-        limine_hook "'/usr/bin/cp' '/usr/share/limine/limine-bios.sys' '$LIMINE_DIR' && '/usr/bin/limine' bios-install '$DISK'" | tee "$LIMINE_HOOK_PATH" || perror $E_LIMINE_HOOK_SETUP_FAILED
+        limine_hook "'/usr/bin/cp' '/usr/share/limine/limine-bios.sys' '$LIMINE_DIR' && '/usr/bin/limine' bios-install '$DISK'" | tee "$LIMINE_HOOK_PATH" || perror $E_LIMINE_HOOK_CREATE
         vertical_sep
     fi
 }
@@ -265,23 +278,26 @@ install() {
 uninstall() {
     # Remove the upgrade hook for Limine
     if test -e "$LIMINE_HOOK_PATH"; then
-        rm "$LIMINE_HOOK_PATH" || perror $E_LIMINE_HOOK_REMOVE_FAILED
+        rm "$LIMINE_HOOK_PATH" || perror $E_LIMINE_HOOK_DELETE
     fi
     if test -e "$UEFI"; then
         # Delete all boot entries on the given partition
         efibootmgr | grep -e "$UUID" | while read -a boot_order; do
             if ! BOOT_NUM=$(remove_prefix_and_postfix "${boot_order[0]}" 'Boot' '*'); then
-                perror $E_BOOT_ENTRY_DELETE_FAILED
+                perror $E_UEFI_BOOT_ENTRY_DELETE
             fi
-            efibootmgr --bootnum "$BOOT_NUM" --delete-bootnum || perror $E_BOOT_ENTRY_DELETE_FAILED
-        done || perror $E_BOOT_ENTRY_DELETE_FAILED
+            efibootmgr --bootnum "$BOOT_NUM" --delete-bootnum || perror $E_UEFI_BOOT_ENTRY_DELETE
+        done || perror $E_UEFI_BOOT_ENTRY_DELETE
     else
-        # Delete the associated boot entry on the disk of the given partition
-        limine bios-install --uninstall --uninstall-data-file"$UNINSTALL_DATA_FILE" "$DISK" || perror $E_BOOT_ENTRY_DELETE_FAILED
+        if ! test -e "$UNINSTALL_DATA_FILE"; then
+            perror $E_LIMINE_UNINSTALL_DATA_MISSING
+        fi
+        # Delete the associated boot entry on the disk of the given partition.
+        limine bios-install --uninstall --uninstall-data-file"$UNINSTALL_DATA_FILE" "$DISK" || perror $E_BIOS_STAGE_1_UNINSTALL
     fi
-    # Remove the Limine directory (contains the boot loader, uninstallation data, and Limine configuration file)
+    # Remove the Limine directory (contains the boot loader, uninstallation data, and Limine configuration file).
     if test -e "$LIMINE_DIR"; then
-        rm -rf "$LIMINE_DIR" || perror $E_BOOT_LOADER_UNINSTALL_FAILED
+        rm -rf "$LIMINE_DIR" || perror $E_LIMINE_DIR_DELETE
     fi
 }
 
