@@ -19,4 +19,4 @@ bash auto_limine.sh /dev/sda1 -u
 ## TODO
 
 - [ ] Add more options for customization of the boot loader.
-- [ ] Improve the error reporting.
+- [X] Improve the error reporting.
