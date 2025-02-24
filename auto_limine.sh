@@ -52,6 +52,7 @@ usage() {
     echo "  -l, --label <label>  The label shown in the boot menu"
     echo "                       (default: 'Arch Linux') (ignored if the --uninstall option is enabled)"
     echo "  -u, --uninstall      Uninstall an existing installation"
+    echo "  -h, --help           Show this help menu and quit"
     echo ""
     echo "Examples:"
     echo "  $NAME /dev/sda1 -l 'Custom Arch Linux'  # install"
@@ -71,6 +72,11 @@ if test -z "$1"; then
 fi
 while test "$#" -gt 0; do
     case "$1" in
+        -h|--help)
+            usage
+            exit 0
+            shift
+            ;;
         -l|--label)
             LABEL="$2"
             if test -z "$LABEL"; then
