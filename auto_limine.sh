@@ -135,10 +135,10 @@ install() {
     # Check which kernel is installed.
     unset HAS_LINUX
     unset HAS_LINUX_LTS
-    if pacman -Qk linux; then
+    if pacman -Q linux; then
         HAS_LINUX="1"
     fi
-    if pacman -Qk linux-lts; then
+    if pacman -Q linux-lts; then
         HAS_LINUX_LTS="1"
     fi
 
