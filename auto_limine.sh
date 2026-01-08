@@ -1,4 +1,4 @@
-#!/usr/bin/bash -u
+#!/usr/bin/env bash
 
 # Utilities
 remove_prefix_and_postfix() {
