@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/usr/bin/bash -u
 
 # Utilities
 remove_prefix_and_postfix() {
@@ -126,6 +126,7 @@ PACMAN_HOOK_DIR="/etc/pacman.d/hooks"
 LIMINE_HOOK_PATH="$PACMAN_HOOK_DIR/limine_upgrade.hook"
 
 UEFI="/sys/firmware/efi/fw_platform_size"
+PTTYPE=$(lsblk -ndo pttype "$DISK")
 
 install() {
     # Define boot entry labels.
@@ -218,10 +219,23 @@ install() {
         vertical_sep
         limine_hook "'/usr/bin/cp' '/usr/share/limine/BOOTX64.EFI' '$LIMINE_DIR'" | tee "$LIMINE_HOOK_PATH" || error "Failed to create the upgrade hook for Limine"
         vertical_sep
+    elif test "$PTTYPE" = "gpt"; then
+        # Extract the partition number from the partition name
+        PART_NUM=$(echo "$PART" | grep -oE '[0-9]+$')
+        if test -z "$PART_NUM"; then
+            error "Failed to extract the partition number from '$PART'"
+        fi
+        # Install the stage 1 and 2 boot loaders on an MBR partition table
+        limine bios-install --uninstall-data-file"$UNINSTALL_DATA_FILE" "$DISK" "$PART_NUM" || error "Failed to install the stage 1 and stage 2 boot loaders"
+    elif test "$PTTYPE" = "dos"; then
+        # Install the stage 1 and 2 boot loaders on a GPT partition table
+        limine bios-install --uninstall-data-file"$UNINSTALL_DATA_FILE" "$DISK" "$" || error "Failed to install the stage 1 and stage 2 boot loaders"
     else
-        # Install the stage 1 and 2 boot loaders
-        limine bios-install --uninstall-data-file"$UNINSTALL_DATA_FILE" "$DISK" || error "Failed to install the stage 1 and stage 2 boot loaders"
-        # Install the stage 3 boot loader
+        error "Unrecognized partition table type: '$PTTYPE' (must be gpt or dos)"
+    fi
+
+    if ! test -e "$UEFI"; then
+        # Install the stage 3 boot loader for BIOS
         cp "/usr/share/limine/limine-bios.sys" "$LIMINE_DIR" || error "Failed to install the stage 3 boot loader"
         # the Limine configuration file
         vertical_sep
