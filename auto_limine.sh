@@ -38,9 +38,10 @@ VERSION=20250222
 # Positional Arguments
 PART=''
 
-# Options
+# Default Options
 LABEL='Arch Linux'
 INSTALL=true
+CRYPT=false
 
 # Proper Usage
 usage() {
@@ -49,10 +50,12 @@ usage() {
     echo ""
     echo "Usage: $NAME <boot partition> [options]"
     echo "Options:"
-    echo "  -l, --label <label>  The label shown in the boot menu"
-    echo "                       (default: 'Arch Linux') (ignored if the --uninstall option is enabled)"
-    echo "  -u, --uninstall      Uninstall an existing installation"
-    echo "  -h, --help           Show this help menu and quit"
+    echo "  -l, --label <label>       The label shown in the boot menu"
+    echo "                            (default: 'Arch Linux') (ignored if the --uninstall option is enabled)"
+    echo "  -c, --crypt <LUKS UUID>   The UUID of the LUKS root partition (if using LUKS to encrypt root)"
+    echo "                            (obtained with 'cryptsetup luksUUID /dev/XXX')"
+    echo "  -u, --uninstall           Uninstall an existing installation"
+    echo "  -h, --help                Show this help menu and quit"
     echo ""
     echo "Examples:"
     echo "  $NAME /dev/sda1 -l 'Custom Arch Linux'  # install"
@@ -87,6 +90,15 @@ while test "$#" -gt 0; do
             ;;
         -u|--uninstall)
             INSTALL=false
+            shift
+            ;;
+        -c|--crypt)
+            CRYPT=true
+            CRYPT_UUID="$2"
+            if test -z "$CRYPT_UUID"; then
+                error_with_usage_and_exit "The given UUID of the LUKS root partition must have at least one character"
+            fi
+            shift
             shift
             ;;
         *)
@@ -149,7 +161,9 @@ install() {
     
     # Define the Limine configuration file
     limine_conf() {
-        ROOT_PART_UUID=$(findmnt / -no uuid) || error "Failed to find the UUID of the partition containing the root filesystem"
+        if ! $CRYPT; then
+            ROOT_PART_UUID=$(findmnt / -no uuid) || error "Failed to find the UUID of the partition containing the root filesystem"
+        fi
 
         echo "timeout: 0"
 
@@ -157,8 +171,15 @@ install() {
             echo ""
             echo "/$BOOT_LABEL_LINUX"
             echo "    protocol: linux"
-            echo "    kernel_path: boot():/vmlinuz-linux"
-            echo "    kernel_cmdline: root=UUID=$ROOT_PART_UUID rw quiet"
+
+            if $CRYPT; then
+                echo "    path: boot():/vmlinuz-linux"
+                echo "    cmdline: quiet cryptdevice=UUID=$CRYPT_UUID:root root=/dev/mapper/root rw rootfstype=ext4"
+            else
+                echo "    kernel_path: boot():/vmlinuz-linux"
+                echo "    kernel_cmdline: root=UUID=$ROOT_PART_UUID rw quiet"
+            fi
+
             echo "    module_path: boot():/initramfs-linux.img"
         fi
 
@@ -166,8 +187,15 @@ install() {
             echo ""
             echo "/$BOOT_LABEL_LINUX_LTS"
             echo "    protocol: linux"
-            echo "    kernel_path: boot():/vmlinuz-linux-lts"
-            echo "    kernel_cmdline: root=UUID=$ROOT_PART_UUID rw quiet"
+
+            if $CRYPT; then
+                echo "    path: boot():/vmlinuz-linux-lts"
+                echo "    cmdline: quiet cryptdevice=UUID=$CRYPT_UUID:root root=/dev/mapper/root rw rootfstype=ext4"
+            else
+                echo "    kernel_path: boot():/vmlinuz-linux-lts"
+                echo "    kernel_cmdline: root=UUID=$ROOT_PART_UUID rw quiet"
+            fi
+
             echo "    module_path: boot():/initramfs-linux-lts.img"
         fi
     }
@@ -211,8 +239,10 @@ install() {
         if test -n "$HAS_LINUX_LTS"; then
             efibootmgr --create --disk "$DISK" --loader "/limine/BOOTX64.EFI" --label "$BOOT_LABEL_LINUX_LTS" --unicode || error "Failed to create the boot entry for Linux LTS"
         fi
+
         # Install the boot loader
         cp "/usr/share/limine/BOOTX64.EFI" "$LIMINE_DIR" || error "Failed to install the UEFI boot loader"
+
         # Create the Limine configuration file
         vertical_sep
         echo "$LIMINE_HOOK_PATH"
@@ -225,6 +255,7 @@ install() {
         if test -z "$PART_NUM"; then
             error "Failed to extract the partition number from '$PART'"
         fi
+
         # Install the stage 1 and 2 boot loaders on an MBR partition table
         limine bios-install --uninstall-data-file"$UNINSTALL_DATA_FILE" "$DISK" "$PART_NUM" || error "Failed to install the stage 1 and stage 2 boot loaders"
     elif test "$PTTYPE" = "dos"; then
@@ -237,6 +268,7 @@ install() {
     if ! test -e "$UEFI"; then
         # Install the stage 3 boot loader for BIOS
         cp "/usr/share/limine/limine-bios.sys" "$LIMINE_DIR" || error "Failed to install the stage 3 boot loader"
+
         # the Limine configuration file
         vertical_sep
         echo "$LIMINE_HOOK_PATH"
@@ -251,6 +283,7 @@ uninstall() {
     if test -e "$LIMINE_HOOK_PATH"; then
         rm "$LIMINE_HOOK_PATH" || error "Failed to delete the upgrade hook for Limine"
     fi
+
     if test -e "$UEFI"; then
         # Delete all boot entries on the given partition
         efibootmgr | grep -e "$UUID" | while read -a boot_order; do
@@ -263,9 +296,11 @@ uninstall() {
         if ! test -e "$UNINSTALL_DATA_FILE"; then
             error "Failed to find the uninstallation data for Limine"
         fi
+
         # Delete the associated boot entry on the disk of the given partition.
         limine bios-install --uninstall --uninstall-data-file"$UNINSTALL_DATA_FILE" "$DISK" || error "Failed to uninstall the stage 1 and stage 2 boot loaders"
     fi
+
     # Remove the Limine directory (contains the boot loader, uninstallation data, and Limine configuration file).
     if test -e "$LIMINE_DIR"; then
         rm -rf "$LIMINE_DIR" || error "Failed to delete the Limine directory on the boot partition"

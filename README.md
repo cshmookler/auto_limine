@@ -18,5 +18,5 @@ bash auto_limine.sh /dev/sda1 -u
 
 ## TODO
 
-- [ ] Add more options for customization of the boot loader.
+- [X] Add support for full filesystem encryption.
 - [X] Improve the error reporting.
