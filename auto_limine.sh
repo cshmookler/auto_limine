@@ -231,13 +231,19 @@ install() {
         mkdir -p "$PACMAN_HOOK_DIR" || error "Failed to create the Pacman hook directory"
     fi
 
+    # Extract the partition number from the partition name
+    PART_NUM=$(echo "$PART" | grep -oE '[0-9]+$')
+    if test -z "$PART_NUM"; then
+        error "Failed to extract the partition number from '$PART'"
+    fi
+
     if test -e "$UEFI"; then
         # Create the boot entry
         if test -n "$HAS_LINUX"; then
-            efibootmgr --create --disk "$PART" --loader "/limine/BOOTX64.EFI" --label "$BOOT_LABEL_LINUX" --unicode || error "Failed to create the boot entry for Linux"
+            efibootmgr --create --disk "$DISK" --part "$PART_NUM" --loader "/limine/BOOTX64.EFI" --label "$BOOT_LABEL_LINUX" --unicode || error "Failed to create the boot entry for Linux"
         fi
         if test -n "$HAS_LINUX_LTS"; then
-            efibootmgr --create --disk "$PART" --loader "/limine/BOOTX64.EFI" --label "$BOOT_LABEL_LINUX_LTS" --unicode || error "Failed to create the boot entry for Linux LTS"
+            efibootmgr --create --disk "$DISK" --part "$PART_NUM" --loader "/limine/BOOTX64.EFI" --label "$BOOT_LABEL_LINUX_LTS" --unicode || error "Failed to create the boot entry for Linux LTS"
         fi
 
         # Install the boot loader
@@ -250,12 +256,6 @@ install() {
         limine_hook "'/usr/bin/cp' '/usr/share/limine/BOOTX64.EFI' '$LIMINE_DIR'" | tee "$LIMINE_HOOK_PATH" || error "Failed to create the upgrade hook for Limine"
         vertical_sep
     elif test "$PTTYPE" = "gpt"; then
-        # Extract the partition number from the partition name
-        PART_NUM=$(echo "$PART" | grep -oE '[0-9]+$')
-        if test -z "$PART_NUM"; then
-            error "Failed to extract the partition number from '$PART'"
-        fi
-
         # Install the stage 1 and 2 boot loaders on an MBR partition table
         limine bios-install --uninstall-data-file"$UNINSTALL_DATA_FILE" "$DISK" "$PART_NUM" || error "Failed to install the stage 1 and stage 2 boot loaders"
     elif test "$PTTYPE" = "dos"; then
