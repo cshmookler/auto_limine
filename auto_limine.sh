@@ -174,10 +174,10 @@ install() {
 
             if $CRYPT; then
                 echo "    path: boot():/vmlinuz-linux"
-                echo "    cmdline: quiet cryptdevice=UUID=$CRYPT_UUID:root root=/dev/mapper/root rw rootfstype=ext4"
+                echo "    cmdline: quiet rd.luks.name=$CRYPT_UUID=root root=/dev/mapper/root rw rootfstype=ext4"
             else
-                echo "    kernel_path: boot():/vmlinuz-linux"
-                echo "    kernel_cmdline: root=UUID=$ROOT_PART_UUID rw quiet"
+                echo "    path: boot():/vmlinuz-linux"
+                echo "    cmdline: root=UUID=$ROOT_PART_UUID rw quiet"
             fi
 
             echo "    module_path: boot():/initramfs-linux.img"
@@ -190,10 +190,10 @@ install() {
 
             if $CRYPT; then
                 echo "    path: boot():/vmlinuz-linux-lts"
-                echo "    cmdline: quiet cryptdevice=UUID=$CRYPT_UUID:root root=/dev/mapper/root rw rootfstype=ext4"
+                echo "    cmdline: quiet rd.luks.name=$CRYPT_UUID=root root=/dev/mapper/root rw rootfstype=ext4"
             else
-                echo "    kernel_path: boot():/vmlinuz-linux-lts"
-                echo "    kernel_cmdline: root=UUID=$ROOT_PART_UUID rw quiet"
+                echo "    path: boot():/vmlinuz-linux-lts"
+                echo "    cmdline: root=UUID=$ROOT_PART_UUID rw quiet"
             fi
 
             echo "    module_path: boot():/initramfs-linux-lts.img"
@@ -234,10 +234,10 @@ install() {
     if test -e "$UEFI"; then
         # Create the boot entry
         if test -n "$HAS_LINUX"; then
-            efibootmgr --create --disk "$DISK" --loader "/limine/BOOTX64.EFI" --label "$BOOT_LABEL_LINUX" --unicode || error "Failed to create the boot entry for Linux"
+            efibootmgr --create --disk "$PART" --loader "/limine/BOOTX64.EFI" --label "$BOOT_LABEL_LINUX" --unicode || error "Failed to create the boot entry for Linux"
         fi
         if test -n "$HAS_LINUX_LTS"; then
-            efibootmgr --create --disk "$DISK" --loader "/limine/BOOTX64.EFI" --label "$BOOT_LABEL_LINUX_LTS" --unicode || error "Failed to create the boot entry for Linux LTS"
+            efibootmgr --create --disk "$PART" --loader "/limine/BOOTX64.EFI" --label "$BOOT_LABEL_LINUX_LTS" --unicode || error "Failed to create the boot entry for Linux LTS"
         fi
 
         # Install the boot loader
